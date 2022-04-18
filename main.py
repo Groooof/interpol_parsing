@@ -7,7 +7,7 @@ countries_for_parse = ('US', )
 
 api = RedNoticesApi()
 parser = Parser(api)
-cards = parser.parse(countries_for_parse)
+cards = parser.parse('all')
 
 print(f'{len(cards)} cards was found')
 

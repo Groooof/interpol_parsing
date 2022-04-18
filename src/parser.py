@@ -2,6 +2,8 @@ from src.api import RedNoticesApi, BaseNoticesApi
 from src.writer import TxtNoticesWriter
 from src.params import InterpolParams
 from math import floor
+from threading import Thread
+from concurrent.futures import ThreadPoolExecutor
 
 
 class BaseCriteriaParser:
@@ -95,20 +97,21 @@ class Parser:
         if wanted_by_countries == 'all':
             wanted_by_countries = self.api.countries.keys()
 
-        gender_parser = CriteriaParser(('gender',), self.api.genders.keys())
-        # age_parser = CriteriaParser(('min_age', 'max_age'), range(self.api.min_age_limit, self.api.max_age_limit + 1), gender_parser)
-        age_parser = AgeParser((18, 120), gender_parser)
-
         full_data = []
-        for country in wanted_by_countries:
-            country_parser = CriteriaParser(('wanted_by',), (country,), age_parser)
-            country_data = country_parser.run()
-            full_data.extend(country_data)
 
-            writer = self.writer_class(f'./results/{country}.txt')
-            if country_data: writer.write(country_data)
-            print(f'*** For country {country} was found {len(country_data)} notices! ***')
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            for country in wanted_by_countries:
+                executor.submit(self.parse_country, country, full_data)
 
         return full_data
 
+    def parse_country(self, country, full_data):
+        gender_parser = CriteriaParser(('gender',), self.api.genders.keys())
+        age_parser = AgeParser((18, 120), gender_parser)
+        country_parser = CriteriaParser(('wanted_by',), (country,), age_parser)
+        country_data = country_parser.run()
+        full_data.extend(country_data)
 
+        writer = self.writer_class(f'./results/{country}.txt')
+        if country_data: writer.write(country_data)
+        print(f'*** For country {country} was found {len(country_data)} notices! ***')
